@@ -24,6 +24,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "backtrace", "prints a backtrace of the stack: a list of the saved Instruction Pointer (IP) values from the nested call instructions that led to the current point of execution.", mon_backtrace},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -58,6 +59,35 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	uint32_t ebp, *ebp_add;
+	uint32_t eip, arg1, arg2, arg3, arg4, arg5;
+	struct Eipdebuginfo info;
+
+	ebp = read_ebp();
+
+	cprintf("Stack backtrace:\n");
+	while (ebp != 0)
+	{
+		ebp_add = (uint32_t *) ebp;
+
+		eip = *(ebp_add + 1);
+		arg1 = *(ebp_add + 2);
+		arg2 = *(ebp_add + 3);
+		arg3 = *(ebp_add + 4);
+		arg4 = *(ebp_add + 5);
+		arg5 = *(ebp_add + 6);
+
+		cprintf("  ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n", ebp,
+		 	eip, arg1, arg2, arg3, arg4, arg5);
+
+		debuginfo_eip(eip, &info);
+
+		cprintf("         %s:%d: %.*s+%d\n", info.eip_file, info.eip_line, 
+		info.eip_fn_namelen, info.eip_fn_name, eip - info.eip_fn_addr);
+
+		ebp = *ebp_add;
+	}
+	
 	return 0;
 }
 
@@ -114,6 +144,15 @@ monitor(struct Trapframe *tf)
 
 	cprintf("Welcome to the JOS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
+
+	int x = 1, y = 3, z = 4;
+	cprintf("x %d, y %x, z %d\n", x, y, z);
+
+	unsigned int i = 0x00646c72;
+ 	cprintf("H%x Wo%s", 57616, &i);
+
+	cprintf("x=%d y=%d", 3);
+
 
 
 	while (1) {
