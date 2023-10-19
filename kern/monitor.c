@@ -149,9 +149,9 @@ monitor(struct Trapframe *tf)
 	cprintf("x %d, y %x, z %d\n", x, y, z);
 
 	unsigned int i = 0x00646c72;
- 	cprintf("H%x Wo%s", 57616, &i);
+ 	cprintf("H%x Wo%s\n", 57616, &i);
 
-	cprintf("x=%d y=%d", 3);
+	cprintf("x=%d y=%d\n", 3);
 
 
 
