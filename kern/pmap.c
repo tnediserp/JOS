@@ -272,7 +272,8 @@ page_init(void)
 	// free pages!
 
 	// page 0 is in use
-	pages[0].pp_ref = 1;
+	pages[0].pp_ref = 0;
+	pages[0].pp_link = NULL;
 
 	// page 1 - npages_basemem are free
 	size_t i;
@@ -285,7 +286,8 @@ page_init(void)
 	// IO holes are in use.
 	for (i = IOPHYSMEM/PGSIZE; i < EXTPHYSMEM/PGSIZE; i++)
 	{
-		pages[i].pp_ref = 1;
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = NULL;
 	}
 
 	// extended memory
@@ -295,7 +297,8 @@ page_init(void)
 	// below result are pages in use.
 	for (i = EXTPHYSMEM/PGSIZE; i < result/PGSIZE; i++)
 	{
-		pages[i].pp_ref = 1;
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = NULL;
 	}
 	// above result are the free pages.
 	for (i = result/PGSIZE; i < npages; i++)

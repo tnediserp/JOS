@@ -347,7 +347,7 @@ mon_dumpmem(int argc, char *argv[], struct Trapframe *tf)
 	}
 	else 
 	{
-		cprintf("usage: memdump [v/p] [start_mem] [words]\n");
+		cprintf("usage: memdump [v/p] [start_mem] [N]\n");
 	}
 	return 0;
 }
