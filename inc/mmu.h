@@ -75,6 +75,11 @@
 // Address in page table or page directory entry
 #define PTE_ADDR(pte)	((physaddr_t) (pte) & ~0xFFF)
 
+// permissions at a pte
+#define PTE_PERM_P(pte) ((physaddr_t) (pte) & 1)
+#define PTE_PERM_W(pte) (((physaddr_t) (pte) >> 1) & 1)
+#define PTE_PERM_U(pte) (((physaddr_t) (pte) >> 2) & 1)
+
 // Control Register flags
 #define CR0_PE		0x00000001	// Protection Enable
 #define CR0_MP		0x00000002	// Monitor coProcessor
