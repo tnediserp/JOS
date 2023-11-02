@@ -26,7 +26,8 @@ typedef int32_t envid_t;
 // stands for the current environment.
 
 #define LOG2NENV		10
-#define NENV			(1 << LOG2NENV)
+#define NENV			(1 << LOG2NENV) // maximum number of simultanuously 
+										// active environments
 #define ENVX(envid)		((envid) & (NENV - 1))
 
 // Values of env_status in struct Env
