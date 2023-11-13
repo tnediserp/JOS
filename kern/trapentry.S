@@ -8,6 +8,7 @@
 
 ###################################################################
 # exceptions/interrupts
+# these are done by software
 ###################################################################
 
 /* TRAPHANDLER defines a globally-visible function for handling a trap.
@@ -20,6 +21,7 @@
  *   void NAME();
  * where NAME is the argument passed to TRAPHANDLER.
  */
+/* error code is pushed by handler */
 #define TRAPHANDLER(name, num)						\
 	.globl name;		/* define global symbol for 'name' */	\
 	.type name, @function;	/* symbol type is function */		\

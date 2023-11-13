@@ -493,11 +493,11 @@ env_pop_tf(struct Trapframe *tf)
 {
 	asm volatile(
 		"\tmovl %0,%%esp\n"
-		"\tpopal\n"
+		"\tpopal\n" // restore all the registers.
 		"\tpopl %%es\n"
 		"\tpopl %%ds\n"
 		"\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
-		"\tiret\n"
+		"\tiret\n" // the rest registers in struct Trapframe
 		: : "g" (tf) : "memory");
 	panic("iret failed");  /* mostly to placate the compiler */
 }

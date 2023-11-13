@@ -203,6 +203,8 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+
+	// user process can read other process's PCB.
 	boot_map_region(kern_pgdir, UENVS, ROUNDUP(n_envs, PGSIZE), PADDR(envs), 
 	PTE_U | PTE_P);
 
