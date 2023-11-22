@@ -111,6 +111,7 @@ lapic_init(void)
 	lapicw(TPR, 0);
 }
 
+// returns the id of the CPU that calls it.
 int
 cpunum(void)
 {

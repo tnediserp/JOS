@@ -85,6 +85,24 @@ sys_exofork(void)
 	// will appear to return 0.
 
 	// LAB 4: Your code here.
+	struct Env *e;
+	int error;
+	if ((error = env_alloc(&e, curenv->env_id)) < 0)
+	{
+		// panic("sys_exofork: %e\n", error);
+		return error;
+	}
+
+	e->env_status = ENV_NOT_RUNNABLE;
+
+	// not enough to just copy register set. Should copy the whole trapframe.
+	e->env_tf = curenv->env_tf;
+
+	// pretend the return value of the child process is 0;
+	e->env_tf.tf_regs.reg_eax = 0;
+
+	return e->env_id;
+	
 	panic("sys_exofork not implemented");
 }
 
@@ -105,6 +123,22 @@ sys_env_set_status(envid_t envid, int status)
 	// envid's status.
 
 	// LAB 4: Your code here.
+	struct Env *e;
+	int error;
+	if ((error = envid2env(envid, &e, 1)) < 0)
+	{
+		return error;
+	}
+
+	if ((status != ENV_RUNNABLE) && (status != ENV_NOT_RUNNABLE))
+	{
+		return -E_INVAL;
+	}
+
+	e->env_status = status;
+
+	return 0;
+
 	panic("sys_env_set_status not implemented");
 }
 
@@ -150,6 +184,32 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	//   allocated!
 
 	// LAB 4: Your code here.
+	struct Env *e;
+	int error;
+	struct PageInfo *pp;
+	// envid2env() fails.
+	if ((error = envid2env(envid, &e, 1)) < 0)
+		return error;
+	// va >= UTOP
+	if ((uintptr_t) va >= UTOP)
+		return -E_INVAL;
+	// va not page aligned;
+	if (((uintptr_t) va) % PGSIZE != 0)
+		return -E_INVAL;
+	// perm is inappropriate.
+	if (((perm & PTE_SYSCALL) != perm) || ((perm | PTE_P | PTE_U) != perm))
+		return -E_INVAL;
+	// no memory to allocate the new page.
+	if ((pp = page_alloc(ALLOC_ZERO)) == NULL)
+		return -E_NO_MEM;
+	// page_insert() fails
+	if ((error = page_insert(e->env_pgdir, pp, va, perm)) < 0)
+	{
+		page_free(pp);
+		return error;
+	}
+	return 0;
+	
 	panic("sys_page_alloc not implemented");
 }
 
@@ -181,6 +241,37 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	//   check the current permissions on the page.
 
 	// LAB 4: Your code here.
+	struct Env *srcenv, *dstenv;
+	int error;
+	struct PageInfo *pp;
+	pte_t *pte;
+	// envid2env() fails.
+	if ((error = envid2env(srcenvid, &srcenv, 1)) < 0)
+		return error;
+	if ((error = envid2env(dstenvid, &dstenv, 1)) < 0)
+		return error;
+	// >= UTOP
+	if (((uintptr_t) srcva >= UTOP) || ((uintptr_t) dstva >= UTOP))
+		return -E_INVAL;
+	// not page aligned
+	if ((((uintptr_t) srcva) % PGSIZE != 0) 
+		|| (((uintptr_t) dstva) % PGSIZE != 0))
+		return -E_INVAL;
+	// srcva is not mapped.
+	if ((pp = page_lookup(srcenv->env_pgdir, srcva, &pte)) == NULL)
+		return -E_INVAL;
+	// perm is inappropriate.
+	if (((perm & PTE_SYSCALL) != perm) || ((perm | PTE_P | PTE_U) != perm))
+		return -E_INVAL;
+	// (perm & PTE_W), but srcva is read-only in srcenvid's address space.
+	if ((perm & PTE_W) && !(PTE_PERM_W(*pte)))
+		return -E_INVAL;
+	// page_insert() fails
+	if ((error = page_insert(dstenv->env_pgdir, pp, dstva, perm)) < 0)
+		return error;
+
+	return 0;
+
 	panic("sys_page_map not implemented");
 }
 
@@ -197,6 +288,19 @@ sys_page_unmap(envid_t envid, void *va)
 	// Hint: This function is a wrapper around page_remove().
 
 	// LAB 4: Your code here.
+	struct Env *e;
+	int error;
+	// envid2env() fails.
+	if ((error = envid2env(envid, &e, 1)) < 0)
+		return error;
+	// va >= UTOP
+	if ((uintptr_t) va >= UTOP)
+		return -E_INVAL;
+	// va not page aligned;
+	if (((uintptr_t) va) % PGSIZE != 0)
+		return -E_INVAL;
+	page_remove(e->env_pgdir, va);
+	return 0;
 	panic("sys_page_unmap not implemented");
 }
 
@@ -287,6 +391,25 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		break;
 	case SYS_env_destroy:
 		return sys_env_destroy(a1);
+		break;
+	case SYS_yield:
+		sys_yield();
+		return 0;
+		break;
+	case SYS_exofork:
+		return sys_exofork();
+		break;
+	case SYS_env_set_status:
+		return sys_env_set_status(a1, a2);
+		break;
+	case SYS_page_alloc:
+		return sys_page_alloc(a1, (void *) a2, a3);
+		break;
+	case SYS_page_map:
+		return sys_page_map(a1, (void *) a2, a3, (void *) a4, a5);
+		break;
+	case SYS_page_unmap:
+		return sys_page_unmap(a1, (void *)a2);
 		break;
 	default:
 		return -E_INVAL;
