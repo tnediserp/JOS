@@ -154,6 +154,15 @@ static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
 	// LAB 4: Your code here.
+	struct Env *e;
+	int error;
+	// envid2env() fails.
+	if ((error = envid2env(envid, &e, 1)) < 0)
+		return error;
+	
+	e->env_pgfault_upcall = func;
+	return 0;
+	
 	panic("sys_env_set_pgfault_upcall not implemented");
 }
 
@@ -245,6 +254,7 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	int error;
 	struct PageInfo *pp;
 	pte_t *pte;
+
 	// envid2env() fails.
 	if ((error = envid2env(srcenvid, &srcenv, 1)) < 0)
 		return error;
@@ -257,22 +267,28 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	if ((((uintptr_t) srcva) % PGSIZE != 0) 
 		|| (((uintptr_t) dstva) % PGSIZE != 0))
 		return -E_INVAL;
+	
 	// srcva is not mapped.
 	if ((pp = page_lookup(srcenv->env_pgdir, srcva, &pte)) == NULL)
 		return -E_INVAL;
+	
 	// perm is inappropriate.
 	if (((perm & PTE_SYSCALL) != perm) || ((perm | PTE_P | PTE_U) != perm))
 		return -E_INVAL;
+
+	
 	// (perm & PTE_W), but srcva is read-only in srcenvid's address space.
 	if ((perm & PTE_W) && !(PTE_PERM_W(*pte)))
 		return -E_INVAL;
+	
 	// page_insert() fails
 	if ((error = page_insert(dstenv->env_pgdir, pp, dstva, perm)) < 0)
 		return error;
+	
 
 	return 0;
 
-	panic("sys_page_map not implemented");
+	// panic("sys_page_map not implemented");
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.
@@ -410,6 +426,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		break;
 	case SYS_page_unmap:
 		return sys_page_unmap(a1, (void *)a2);
+		break;
+	case SYS_env_set_pgfault_upcall:
+		return sys_env_set_pgfault_upcall(a1, (void *) a2);
 		break;
 	default:
 		return -E_INVAL;

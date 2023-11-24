@@ -6,6 +6,15 @@
 // PTE_COW marks copy-on-write page table entries.
 // It is one of the bits explicitly allocated to user processes (PTE_AVAIL).
 #define PTE_COW		0x800
+#define PTE_PERM_COW(pte) (((physaddr_t) (pte) >> 11) & 1)
+
+/*
+// given virtual address va, return the PTE address of va.
+physaddr_t *pte_address(void *va)
+{
+	return (physaddr_t *) ((0x3bd << 22) | (((uintptr_t) va >> 10) & 0x3ffffc));
+}
+*/
 
 //
 // Custom page fault handler - if faulting page is copy-on-write,
@@ -26,6 +35,21 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 4: Your code here.
 
+	// Otherwise, things go wrong in syscalls.
+	addr = ROUNDDOWN(addr, PGSIZE);
+
+	// not a write error
+	if (!(err & FEC_WR))
+	{
+		panic("pgfault: not a write error.\n");
+	}
+	pte_t pte = uvpt[PGNUM(addr)];
+	// not a COW page.
+	if (!(PTE_PERM_COW(pte) && PTE_PERM_P(pte)))
+	{
+		panic("pgfault: not a COW page.\n");
+	}
+
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
 	// page to the old page's address.
@@ -33,8 +57,30 @@ pgfault(struct UTrapframe *utf)
 	//   You should make three system calls.
 
 	// LAB 4: Your code here.
+	// allocate a new page and map it to PFTEMP.
+	if ((r = sys_page_alloc(0, (void *) PFTEMP, 
+		PTE_U | PTE_P | PTE_W)) < 0)
+	{
+		panic("pgfault: %e\n", r);
+	}
 
-	panic("pgfault not implemented");
+	// copy the data from the old page to the new page
+	memmove((void *) PFTEMP, addr, PGSIZE);
+
+	// move the new page to the old page's address
+	if ((r = sys_page_map(0, (void *)PFTEMP, 0, 
+		addr, PTE_U | PTE_P | PTE_W)) < 0)
+	{
+		panic("sys_page_map: %e\n", r);
+	}
+
+	// unmap PFTEMP
+	if ((r = sys_page_unmap(0, (void *) PFTEMP)) < 0)
+	{
+		panic("sys_page_unmap: %e\n", r);
+	}
+    return;
+
 }
 
 //
@@ -51,10 +97,28 @@ pgfault(struct UTrapframe *utf)
 static int
 duppage(envid_t envid, unsigned pn)
 {
+	
 	int r;
 
 	// LAB 4: Your code here.
-	panic("duppage not implemented");
+	void *va = (void *) (pn * PGSIZE);
+	uintptr_t addr = (uintptr_t) va;
+	
+	// map the page copy-on-write in envid's space.
+	if ((r = sys_page_map(0, va, envid, va, 
+		PTE_P | PTE_U | PTE_COW)) < 0)
+	{
+		panic("duppage: %e\n", r);
+	}
+	
+	// remap the page copy-on-write in its own address space.
+	if ((r = sys_page_map(0, va, 0, va, 
+		PTE_P | PTE_U | PTE_COW)) < 0)
+	{
+		panic("duppage: %e\n", r);
+	}
+
+	// panic("duppage not implemented");
 	return 0;
 }
 
@@ -77,8 +141,94 @@ duppage(envid_t envid, unsigned pn)
 envid_t
 fork(void)
 {
+	
 	// LAB 4: Your code here.
+	envid_t envid;
+	uintptr_t addr;
+	int r;
+
+	// install page fault handler
+	set_pgfault_handler(pgfault);
+
+	// create a child environment.
+	envid = sys_exofork();
+	if (envid < 0)
+		panic("sys_exofork: %e", envid);
+	if (envid == 0) {
+		// We're the child.
+		// The copied value of the global variable 'thisenv'
+		// is no longer valid (it refers to the parent!).
+		// Fix it and return 0.
+		cprintf("%04x: this is child\n", sys_getenvid());
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+
+	// parent
+	for (addr = UTEXT; addr < UTOP; addr += PGSIZE)
+	{
+		pde_t pde = uvpd[PDX(addr)];
+
+		// if this PT is not present.
+		if (!PTE_PERM_P(pde))
+		{
+			addr += PTSIZE;
+			continue;
+		}
+
+		pte_t pte = uvpt[PGNUM(addr)];
+
+		// cprintf("pde=%x\n", pde);
+		
+		// if this page is the exception stack.
+		if (addr == UXSTACKTOP - PGSIZE)
+		{
+			if ((r = sys_page_alloc(envid, (void *) (addr), 
+				PTE_U | PTE_P | PTE_W)) < 0)
+			{
+				panic("fork: %e\n", r);
+			}
+			continue;
+		}
+
+		// if this page is not present
+		if (!PTE_PERM_P(pde) || !PTE_PERM_P(pte))
+			continue;
+
+		// if the page is writable or copy-on-write
+		if (PTE_PERM_W(pte) || PTE_PERM_COW(pte))
+			duppage(envid, PGNUM(addr));
+
+		// if this page is present but read-only
+		else 
+		{
+			if ((r = sys_page_map(0, (void *) addr, envid, 
+				(void *) addr, PTE_P | PTE_U)) < 0)
+			{
+				panic("fork: %e\n", r);
+			}
+		}
+		
+	}
+
+	// sets the user page fault entrypoint for the child.
+	if ((r = sys_env_set_pgfault_upcall(envid, thisenv->env_pgfault_upcall)) 
+		< 0)
+	{
+		panic("sys_env_set_pgfault_upcall: %e\n", r);
+	}
+
+	// mark the child runnable
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+	{
+		panic("sys_env_set_status: %e\n", r);
+	}
+
+	return envid;
+		
+	
 	panic("fork not implemented");
+
 }
 
 // Challenge!
