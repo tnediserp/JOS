@@ -362,6 +362,53 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
+	struct Env *dstenv;
+	struct PageInfo *pp;
+	pte_t *pte;
+	int err, sendpage = 0;
+	// envid2env() fails.
+	if ((err = envid2env(envid, &dstenv, 0)) < 0)
+		return err;
+	if (dstenv->env_status != ENV_NOT_RUNNABLE || !dstenv->env_ipc_recving)
+		return -E_IPC_NOT_RECV;
+
+	// try to send a page and dstenv is requesting.
+	if ((uintptr_t) srcva < UTOP && (uintptr_t) dstenv->env_ipc_dstva < UTOP)
+	{
+		sendpage = 1;
+		// not page aligned.
+		if (((uintptr_t) srcva) % PGSIZE != 0)
+			return -E_INVAL;
+		// perm is inappropriate.
+		if (((perm & PTE_SYSCALL) != perm) || ((perm | PTE_P | PTE_U) != perm))
+			return -E_INVAL;
+		// srcva is not mapped in the caller's address space.
+		if ((pp = page_lookup(curenv->env_pgdir, srcva, &pte)) == NULL)
+			return -E_INVAL;
+		// (perm & PTE_W), but srcva is read-only in curenv's address space.
+		if ((perm & PTE_W) && !(PTE_PERM_W(*pte)))
+			return -E_INVAL;
+		// page_insert() fails
+		if ((err = page_insert(dstenv->env_pgdir, pp, dstenv->env_ipc_dstva, 
+			perm)) < 0)
+			return err;
+	}
+
+	// update target's ipc field.
+	dstenv->env_ipc_recving = 0;
+	dstenv->env_ipc_from = curenv->env_id;
+	dstenv->env_ipc_value = value;
+	if (sendpage)
+		dstenv->env_ipc_perm = perm;
+	else dstenv->env_ipc_perm = 0;
+
+	dstenv->env_status = ENV_RUNNABLE;
+
+	// since sys_ipc_recv() does not returns, should "help" it return.
+	dstenv->env_tf.tf_regs.reg_eax = 0;
+
+	return 0;
+
 	panic("sys_ipc_try_send not implemented");
 }
 
@@ -380,7 +427,18 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+	if ((uintptr_t) dstva < UTOP)
+	{
+		// dstva < UTOP but dstva is not page-aligned.
+		if (((uintptr_t) dstva) % PGSIZE != 0)
+			return -E_INVAL;
+	}
+	
+	curenv->env_ipc_dstva = dstva;
+	curenv->env_ipc_recving = 1;
+	curenv->env_status = ENV_NOT_RUNNABLE;
+	sched_yield();
+	// panic("sys_ipc_recv not implemented");
 	return 0;
 }
 
@@ -429,6 +487,12 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		break;
 	case SYS_env_set_pgfault_upcall:
 		return sys_env_set_pgfault_upcall(a1, (void *) a2);
+		break;
+	case SYS_ipc_try_send:
+		return sys_ipc_try_send(a1, a2, (void *) a3, a4);
+		break;
+	case SYS_ipc_recv:
+		return sys_ipc_recv((void *) a1);
 		break;
 	default:
 		return -E_INVAL;

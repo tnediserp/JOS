@@ -159,7 +159,7 @@ fork(void)
 		// The copied value of the global variable 'thisenv'
 		// is no longer valid (it refers to the parent!).
 		// Fix it and return 0.
-		cprintf("%04x: this is child\n", sys_getenvid());
+		// cprintf("%04x: this is child\n", sys_getenvid());
 		thisenv = &envs[ENVX(sys_getenvid())];
 		return 0;
 	}
