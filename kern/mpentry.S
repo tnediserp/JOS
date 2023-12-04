@@ -74,6 +74,9 @@ start32:
 	movl    $0x0, %ebp       # nuke frame pointer
 
 	# Call mp_main().  (Exercise for the reader: why the indirect call?)
+	# 低地址到高地址，没法使用直接跳转。
+	# 1.编译不能过
+	# 2.即使过了，跳转的位置也是错的
 	movl    $mp_main, %eax
 	call    *%eax
 
