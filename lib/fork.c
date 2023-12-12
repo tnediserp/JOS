@@ -41,7 +41,7 @@ pgfault(struct UTrapframe *utf)
 	// not a write error
 	if (!(err & FEC_WR))
 	{
-		panic("pgfault: not a write error.\n");
+		panic("pgfault: not a write error, err=%d.\n", err);
 	}
 	pte_t pte = uvpt[PGNUM(addr)];
 	// not a COW page.
@@ -80,7 +80,6 @@ pgfault(struct UTrapframe *utf)
 		panic("sys_page_unmap: %e\n", r);
 	}
     return;
-
 }
 
 //
@@ -103,20 +102,35 @@ duppage(envid_t envid, unsigned pn)
 	// LAB 4: Your code here.
 	void *va = (void *) (pn * PGSIZE);
 	uintptr_t addr = (uintptr_t) va;
-	
-	// map the page copy-on-write in envid's space.
-	if ((r = sys_page_map(0, va, envid, va, 
-		PTE_P | PTE_U | PTE_COW)) < 0)
+	pte_t pte = uvpt[PGNUM(addr)];
+
+	// shared page.
+	if (pte & PTE_SHARE)
 	{
-		panic("duppage: %e\n", r);
+		// copy the mapping directly
+		if ((r = sys_page_map(0, va, envid, va, pte & PTE_SYSCALL)) < 0)
+			panic("duppage: %e\n", r);
+	}
+
+	// writable or copy on write.
+	else if (PTE_PERM_W(pte) || PTE_PERM_COW(pte))
+	{
+		// map the page copy-on-write in envid's space.
+		if ((r = sys_page_map(0, va, envid, va, PTE_P | PTE_U | PTE_COW)) < 0)
+			panic("duppage: %e\n", r);
+	
+		// remap the page copy-on-write in its own address space.
+		if ((r = sys_page_map(0, va, 0, va, PTE_P | PTE_U | PTE_COW)) < 0)
+			panic("duppage: %e\n", r);
+	}
+
+	// read-only
+	else 
+	{
+		if ((r = sys_page_map(0, va, envid, va, PTE_P | PTE_U)) < 0)
+			panic("duppage: %e\n", r);
 	}
 	
-	// remap the page copy-on-write in its own address space.
-	if ((r = sys_page_map(0, va, 0, va, 
-		PTE_P | PTE_U | PTE_COW)) < 0)
-	{
-		panic("duppage: %e\n", r);
-	}
 
 	// panic("duppage not implemented");
 	return 0;
@@ -146,6 +160,7 @@ fork(void)
 	envid_t envid;
 	uintptr_t addr;
 	int r;
+	extern void _pgfault_upcall();
 
 	// install page fault handler
 	set_pgfault_handler(pgfault);
@@ -169,13 +184,9 @@ fork(void)
 	{
 		pde_t pde = uvpd[PDX(addr)];
 
-		// if this PT is not present.
 		if (!PTE_PERM_P(pde))
-		{
-			addr += PTSIZE;
 			continue;
-		}
-
+		
 		pte_t pte = uvpt[PGNUM(addr)];
 
 		// cprintf("pde=%x\n", pde);
@@ -195,24 +206,11 @@ fork(void)
 		if (!PTE_PERM_P(pde) || !PTE_PERM_P(pte))
 			continue;
 
-		// if the page is writable or copy-on-write
-		if (PTE_PERM_W(pte) || PTE_PERM_COW(pte))
-			duppage(envid, PGNUM(addr));
-
-		// if this page is present but read-only
-		else 
-		{
-			if ((r = sys_page_map(0, (void *) addr, envid, 
-				(void *) addr, PTE_P | PTE_U)) < 0)
-			{
-				panic("fork: %e\n", r);
-			}
-		}
-		
+		duppage(envid, PGNUM(addr));
 	}
 
 	// sets the user page fault entrypoint for the child.
-	if ((r = sys_env_set_pgfault_upcall(envid, thisenv->env_pgfault_upcall)) 
+	if ((r = sys_env_set_pgfault_upcall(envid, _pgfault_upcall)) 
 		< 0)
 	{
 		panic("sys_env_set_pgfault_upcall: %e\n", r);
@@ -228,7 +226,6 @@ fork(void)
 		
 	
 	panic("fork not implemented");
-
 }
 
 // Challenge!

@@ -18,11 +18,17 @@ umain(int argc, char **argv)
 	if ((r = sys_page_alloc(0, VA, PTE_P|PTE_W|PTE_U|PTE_SHARE)) < 0)
 		panic("sys_page_alloc: %e", r);
 
+	pte_t pte = uvpt[PGNUM(VA)];
+	cprintf("%x\n", pte);
+
 	// check fork
 	if ((r = fork()) < 0)
 		panic("fork: %e", r);
+
+	cprintf("fork succeeds\n");
 	if (r == 0) {
 		strcpy(VA, msg);
+		cprintf("this is child, child succeed\n");
 		exit();
 	}
 	wait(r);

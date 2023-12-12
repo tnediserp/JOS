@@ -209,12 +209,28 @@ serve_read(envid_t envid, union Fsipc *ipc)
 {
 	struct Fsreq_read *req = &ipc->read;
 	struct Fsret_read *ret = &ipc->readRet;
+	struct OpenFile *o;
+	int r;
 
 	if (debug)
 		cprintf("serve_read %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// Lab 5: Your code here:
-	return 0;
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+
+	// current seek position: o->o_fd->fd_offset.
+	ssize_t count;
+	if ((count = file_read(o->o_file, ret->ret_buf, req->req_n, 
+		o->o_fd->fd_offset)) < 0)
+		return count;
+	
+	// update the seek position.
+	o->o_fd->fd_offset += count;
+
+	return count;
+	//return 0;
+	
 }
 
 
@@ -228,8 +244,23 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 	if (debug)
 		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
+	int r, count;
+	struct OpenFile *o;
+
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+
+	// file_write() extends the file if necessary
+	if ((count = file_write(o->o_file, req->req_buf, req->req_n, 
+		o->o_fd->fd_offset)) < 0)
+		return count;
+	
+	// update the seek position.
+	o->o_fd->fd_offset += count;
+	return count;
+
+	// panic("serve_write not implemented");
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the

@@ -59,7 +59,7 @@ ide_set_disk(int d)
 	diskno = d;
 }
 
-
+// read nsecs sectors starting from secno into address dst.
 int
 ide_read(uint32_t secno, void *dst, size_t nsecs)
 {
