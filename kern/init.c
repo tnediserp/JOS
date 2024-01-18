@@ -56,7 +56,7 @@ i386_init(void)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_icode, ENV_TYPE_USER);
+	// ENV_CREATE(user_icode, ENV_TYPE_USER);
 #endif // TEST*
 
 	// Should not be necessary - drains keyboard because interrupt has given up.
@@ -92,6 +92,7 @@ boot_aps(void)
 		// Tell mpentry.S what stack to use 
 		mpentry_kstack = percpu_kstacks[c - cpus] + KSTKSIZE;
 		// Start the CPU at mpentry_start
+		// 进入mpentry.S?
 		lapic_startap(c->cpu_id, PADDR(code));
 		// Wait for the CPU to finish some basic setup in mp_main()
 		while(c->cpu_status != CPU_STARTED)
@@ -101,6 +102,7 @@ boot_aps(void)
 
 // Setup code for APs
 // called in mpentry.S
+// 每个CPU都要call一遍mp_main()
 void
 mp_main(void)
 {

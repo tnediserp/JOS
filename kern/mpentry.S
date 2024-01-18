@@ -26,6 +26,7 @@
 #    - it does not need to enable A20
 #    - it uses MPBOOTPHYS to calculate absolute addresses of its
 #      symbols, rather than relying on the linker to fill them
+# 此时只能读取低地址，所以要把高地址转化成低地址
 
 #define RELOC(x) ((x) - KERNBASE)
 #define MPBOOTPHYS(s) ((s) - mpentry_start + MPENTRY_PADDR)

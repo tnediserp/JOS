@@ -15,12 +15,14 @@ start:
   cli                         # Disable interrupts
   cld                         # String operations increment
 
+  # 初始化段寄存器
   # Set up the important data segment registers (DS, ES, SS).
   xorw    %ax,%ax             # Segment number zero
   movw    %ax,%ds             # -> Data Segment
   movw    %ax,%es             # -> Extra Segment
   movw    %ax,%ss             # -> Stack Segment
 
+  # 开启A20地址线
   # Enable A20:
   #   For backwards compatibility with the earliest PCs, physical
   #   address line 20 is tied low, so that addresses higher than
@@ -41,6 +43,7 @@ seta20.2:
   movb    $0xdf,%al               # 0xdf -> port 0x60
   outb    %al,$0x60
 
+  # 切换到保护模式并启动GDT
   # Switch from real to protected mode, using a bootstrap GDT
   # and segment translation that makes virtual addresses 
   # identical to their physical addresses, so that the 
@@ -52,10 +55,12 @@ seta20.2:
   
   # Jump to next instruction, but in 32-bit code segment.
   # Switches processor into 32-bit mode.
+  # 作用：清空流水线
   ljmp    $PROT_MODE_CSEG, $protcseg
 
   .code32                     # Assemble for 32-bit mode
 protcseg:
+  # 使用GDT表重新初始化段寄存器
   # Set up the protected-mode data segment registers
   movw    $PROT_MODE_DSEG, %ax    # Our data segment selector
   movw    %ax, %ds                # -> DS: Data Segment
@@ -66,6 +71,7 @@ protcseg:
   
   # Set up the stack pointer and call into C.
   movl    $start, %esp
+  # 加载内核，最终跳转到内核入口
   call bootmain
 
   # If bootmain returns (it shouldn't), loop.

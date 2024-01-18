@@ -114,7 +114,7 @@ trap_init(void)
 	SETGATE(idt[T_SEGNP], 0, GD_KT, handler_T_SEGNP, 0);
 	SETGATE(idt[T_STACK], 0, GD_KT, handler_T_STACK, 0);
 	SETGATE(idt[T_GPFLT], 0, GD_KT, handler_T_GPFLT, 0);
-	SETGATE(idt[T_PGFLT], 0, GD_KT, handler_T_PGFLT, 0);
+	SETGATE(idt[T_PGFLT], 0, GD_KT, handler_T_PGFLT, 3);
 	SETGATE(idt[T_FPERR], 0, GD_KT, handler_T_FPERR, 0);
 	SETGATE(idt[T_ALIGN], 0, GD_KT, handler_T_ALIGN, 0);
 	SETGATE(idt[T_MCHK], 0, GD_KT, handler_T_MCHK, 0);

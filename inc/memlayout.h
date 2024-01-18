@@ -18,6 +18,18 @@
 #define GD_UD     0x20     // user data
 #define GD_TSS0   0x28     // Task segment selector for CPU 0
 
+// KERNBASE以上的虚拟地址va总是映射到va-KERNBASE
+
+// user environment will have no permission to any of the memory above ULIM, 
+// while the kernel will be able to read and write this memory.
+
+// [UTOP, ULIM): both read-only for the kernel and the user
+
+// the address space below UTOP is for the user environment
+// to use; the user environment will set permissions for accessing this memory.
+
+// [UPAGES, UVPT]用于存放PageInfo结构体。
+
 /*
  * Virtual memory map:                                Permissions
  *                                                    kernel/user

@@ -162,6 +162,7 @@ mpconfig(struct mp **pmp)
 	return conf;
 }
 
+// BSP进行必要的初始化
 void
 mp_init(void)
 {

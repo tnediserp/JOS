@@ -250,6 +250,7 @@ mem_init(void)
 	//
 	// If the machine reboots at this point, you've probably set up your
 	// kern_pgdir wrong.
+	// lcr3()的作用
 	lcr3(PADDR(kern_pgdir));
 
 	check_page_free_list(0);

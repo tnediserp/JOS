@@ -66,6 +66,9 @@ entry:
 	# (why is this okay?).  Jump up above KERNBASE before entering
 	# C code.
 	mov	$relocated, %eax
+	# 跳转到高地址：后续的运行需要在高地址空间中
+	# 间接跳转：直接跳转的偏移量写死在指令里，跳转的范围有限。间接跳转的地址放在寄存器
+	# 里，范围大得多
 	jmp	*%eax
 relocated:
 

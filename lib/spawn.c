@@ -85,6 +85,7 @@ spawn(const char *prog, const char **argv)
 	//
 	//   - Start the child process running with sys_env_set_status().
 
+	// 从⽂件系统打开prog参数对应的程序⽂件
 	if ((r = open(prog, O_RDONLY)) < 0)
 		return r;
 	fd = r;
@@ -103,7 +104,7 @@ spawn(const char *prog, const char **argv)
 		return r;
 	child = r;
 
-	// Set up trap frame, including initial stack.
+	//  Set up trap frame, including initial stack.
 	child_tf = envs[ENVX(child)].env_tf;
 	child_tf.tf_eip = elf->e_entry;
 
@@ -111,6 +112,8 @@ spawn(const char *prog, const char **argv)
 		return r;
 
 	// Set up program segments as defined in ELF header.
+	// 根据ELF⽂件中program herder，将用户程序以Segment读⼊内存，并映
+	// 射到指定的线性地址处
 	ph = (struct Proghdr*) (elf_buf + elf->e_phoff);
 	for (i = 0; i < elf->e_phnum; i++, ph++) {
 		if (ph->p_type != ELF_PROG_LOAD)
@@ -133,6 +136,7 @@ spawn(const char *prog, const char **argv)
 	if ((r = sys_env_set_trapframe(child, &child_tf)) < 0)
 		panic("sys_env_set_trapframe: %e", r);
 
+	// 设置状态为ENV_RUNNABLE
 	if ((r = sys_env_set_status(child, ENV_RUNNABLE)) < 0)
 		panic("sys_env_set_status: %e", r);
 

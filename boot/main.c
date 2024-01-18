@@ -49,12 +49,15 @@ bootmain(void)
 		goto bad;
 
 	// load each program segment (ignores ph flags)
+	// 第一个program header的起始地址
 	ph = (struct Proghdr *) ((uint8_t *) ELFHDR + ELFHDR->e_phoff);
+	// program header的终止地址
 	eph = ph + ELFHDR->e_phnum;
 	for (; ph < eph; ph++) {
 		// p_pa is the load address of this segment (as well
 		// as the physical address)
 		readseg(ph->p_pa, ph->p_memsz, ph->p_offset);
+		// memset?
 		for (i = 0; i < ph->p_memsz - ph->p_filesz; i++) {
 			*((char *) ph->p_pa + ph->p_filesz + i) = 0;
 		}
