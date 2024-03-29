@@ -16,3 +16,6 @@
 /sol?/
 /myapi.key
 /.suf
+*.d 
+*.s
+/__pycache__
